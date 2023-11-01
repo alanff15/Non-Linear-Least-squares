@@ -6,48 +6,51 @@
 #define DEFAULT_EPSILON (1e-8)
 #define DEFAULT_DELTA (1e-5)
 
-template <typename NUM_TYP, uint32_t N>
+#define VEC_TYPE Eigen::Matrix<NUM_TYPE, N, 1>
+#define MAT_TYPE Eigen::Matrix<NUM_TYPE, N, N>
+
+template <typename NUM_TYPE, uint32_t N>
 class NonLinearLSQ {
 public:
   NonLinearLSQ();
   ~NonLinearLSQ();
 
-  void setErrorFunction(const std::function<NUM_TYP(const Eigen::Matrix<NUM_TYP, N, 1>&, const std::vector<NUM_TYP>&)>&);
-  void setData(const std::vector<std::vector<NUM_TYP>>&);
-  void solve(const Eigen::Matrix<NUM_TYP, N, 1>&);
-  Eigen::Matrix<NUM_TYP, N, 1> getParam();
+  void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>&);
+  void setData(const std::vector<std::vector<NUM_TYPE>>&);
+  void solve(const VEC_TYPE&);
+  VEC_TYPE getParam();
 
 private:
-  NUM_TYP derror_dx(int, const Eigen::Matrix<NUM_TYP, N, 1>&, const std::vector<NUM_TYP>&);
-  void getSystem(const Eigen::Matrix<NUM_TYP, N, 1>&, Eigen::Matrix<NUM_TYP, N, N>&, Eigen::Matrix<NUM_TYP, N, 1>&);
+  NUM_TYPE derror_dx(int, const VEC_TYPE&, const std::vector<NUM_TYPE>&);
+  void getSystem(const VEC_TYPE&, MAT_TYPE&, VEC_TYPE&);
 
-  Eigen::Matrix<NUM_TYP, N, 1> delta;
-  Eigen::Matrix<NUM_TYP, N, 1> final_param;
-  const std::vector<std::vector<NUM_TYP>>* data;
-  std::function<NUM_TYP(const Eigen::Matrix<NUM_TYP, N, 1>&, const std::vector<NUM_TYP>&)> error;
+  VEC_TYPE delta;
+  VEC_TYPE final_param;
+  const std::vector<std::vector<NUM_TYPE>>* data;
+  std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)> error;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 //   Implementation:   ////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-template <typename NUM_TYP, uint32_t N>
-NonLinearLSQ<NUM_TYP, N>::NonLinearLSQ() {}
+template <typename NUM_TYPE, uint32_t N>
+NonLinearLSQ<NUM_TYPE, N>::NonLinearLSQ() {}
 
-template <typename NUM_TYP, uint32_t N>
-NonLinearLSQ<NUM_TYP, N>::~NonLinearLSQ() {}
+template <typename NUM_TYPE, uint32_t N>
+NonLinearLSQ<NUM_TYPE, N>::~NonLinearLSQ() {}
 
-template <typename NUM_TYP, uint32_t N>
-NUM_TYP NonLinearLSQ<NUM_TYP, N>::derror_dx(int dx_index, const Eigen::Matrix<NUM_TYP, N, 1>& input, const std::vector<NUM_TYP>& data_line) {
-  Eigen::Matrix<NUM_TYP, N, 1> input_delta = input;
+template <typename NUM_TYPE, uint32_t N>
+NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::derror_dx(int dx_index, const VEC_TYPE& input, const std::vector<NUM_TYPE>& data_line) {
+  VEC_TYPE input_delta = input;
   input_delta[dx_index] += delta[dx_index];
   return (error(input_delta, data_line) - error(input, data_line)) / delta[dx_index];
 }
 
-template <typename NUM_TYP, uint32_t N>
-void NonLinearLSQ<NUM_TYP, N>::getSystem(const Eigen::Matrix<NUM_TYP, N, 1>& input, Eigen::Matrix<NUM_TYP, N, N>& H, Eigen::Matrix<NUM_TYP, N, 1>& b) {
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& input, MAT_TYPE& H, VEC_TYPE& b) {
   delta.resize(input.rows(), 1);
-  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYP)DEFAULT_DELTA;
+  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
   // zerar sistema
   for (int j, i = 0; i < H.rows(); i++) {
     for (j = 0; j < H.cols(); j++) {
@@ -56,10 +59,10 @@ void NonLinearLSQ<NUM_TYP, N>::getSystem(const Eigen::Matrix<NUM_TYP, N, 1>& inp
     b(i) = 0;
   }
   // varer dados
-  Eigen::Matrix<NUM_TYP, N, N> Hs;
-  Eigen::Matrix<NUM_TYP, N, 1> bs;
-  Eigen::Matrix<NUM_TYP, N, 1> Jt;  // rows:IN_TYPE cols:OUT_TYPE
-  NUM_TYP err;
+  MAT_TYPE Hs;
+  VEC_TYPE bs;
+  VEC_TYPE Jt;  // rows:IN_TYPE cols:OUT_TYPE
+  NUM_TYPE err;
   for (int j, i = 0; i < data->size(); i++) {
     err = error(input, (*data)[i]);
     for (j = 0; j < Jt.rows(); j++) {
@@ -72,32 +75,32 @@ void NonLinearLSQ<NUM_TYP, N>::getSystem(const Eigen::Matrix<NUM_TYP, N, 1>& inp
   }
 }
 
-template <typename NUM_TYP, uint32_t N>
-void NonLinearLSQ<NUM_TYP, N>::setErrorFunction(const std::function<NUM_TYP(const Eigen::Matrix<NUM_TYP, N, 1>&, const std::vector<NUM_TYP>&)>& func) {
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func) {
   error = func;
 }
 
-template <typename NUM_TYP, uint32_t N>
-void NonLinearLSQ<NUM_TYP, N>::setData(const std::vector<std::vector<NUM_TYP>>& data_in) {
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setData(const std::vector<std::vector<NUM_TYPE>>& data_in) {
   data = &data_in;
 }
 
-template <typename NUM_TYP, uint32_t N>
-void NonLinearLSQ<NUM_TYP, N>::solve(const Eigen::Matrix<NUM_TYP, N, 1>& input_gess) {
-  Eigen::Matrix<NUM_TYP, N, 1> param = input_gess;
-  Eigen::Matrix<NUM_TYP, N, N> H;
-  Eigen::Matrix<NUM_TYP, N, 1> b;
-  Eigen::Matrix<NUM_TYP, N, 1> delta_param;
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& input_gess) {
+  VEC_TYPE param = input_gess;
+  MAT_TYPE H;
+  VEC_TYPE b;
+  VEC_TYPE delta_param;
   int itr = 1;
   do {
     getSystem(param, H, b);
     delta_param = H.colPivHouseholderQr().solve(-b);
     param += delta_param;
-  } while ((delta_param.norm() > (NUM_TYP)DEFAULT_EPSILON) && (++itr < DEFAULT_MAX_ITR));
+  } while ((delta_param.norm() > (NUM_TYPE)DEFAULT_EPSILON) && (++itr < DEFAULT_MAX_ITR));
   final_param = param;
 }
 
-template <typename NUM_TYP, uint32_t N>
-Eigen::Matrix<NUM_TYP, N, 1> NonLinearLSQ<NUM_TYP, N>::getParam() {
+template <typename NUM_TYPE, uint32_t N>
+VEC_TYPE NonLinearLSQ<NUM_TYPE, N>::getParam() {
   return final_param;
 }
