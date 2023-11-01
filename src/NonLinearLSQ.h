@@ -2,9 +2,9 @@
 
 #include <Eigen/Eigen>
 
-#define PARAM_TYPE Eigen::Vector2d
-#define MATRIX_TYPE Eigen::MatrixXd
 #define ERROR_TYPE double
+#define VECTOR_TYPE Eigen::Matrix<ERROR_TYPE, -1, 1>
+#define MATRIX_TYPE Eigen::Matrix<ERROR_TYPE, -1, -1>
 
 #define DEFAULT_MAX_ITR 500
 #define DEFAULT_EPSILON (ERROR_TYPE)(1e-8)
@@ -15,17 +15,17 @@ public:
   NonLinearLSQ();
   ~NonLinearLSQ();
 
-  void setErrorFunction(const std::function<ERROR_TYPE(const PARAM_TYPE&, const std::vector<ERROR_TYPE>&)>& func);
+  void setErrorFunction(const std::function<ERROR_TYPE(const VECTOR_TYPE&, const std::vector<ERROR_TYPE>&)>& func);
   void setData(const std::vector<std::vector<ERROR_TYPE>>& data_in);
-  void solve(const PARAM_TYPE& param_gess);
-  PARAM_TYPE getParam();
+  void solve(const VECTOR_TYPE& param_gess);
+  VECTOR_TYPE getParam();
 
 private:
-  ERROR_TYPE derror_dx(int dx_index, const PARAM_TYPE& param, const std::vector<ERROR_TYPE>& data_line);
-  void getSystem(const PARAM_TYPE& param, MATRIX_TYPE& H, PARAM_TYPE& b);
+  ERROR_TYPE derror_dx(int dx_index, const VECTOR_TYPE& param, const std::vector<ERROR_TYPE>& data_line);
+  void getSystem(const VECTOR_TYPE& param, MATRIX_TYPE& H, VECTOR_TYPE& b);
 
-  PARAM_TYPE delta;
-  PARAM_TYPE final_param;
+  VECTOR_TYPE delta;
+  VECTOR_TYPE final_param;
   const std::vector<std::vector<ERROR_TYPE>>* data;
-  std::function<ERROR_TYPE(const PARAM_TYPE&, const std::vector<ERROR_TYPE>&)> error;
+  std::function<ERROR_TYPE(const VECTOR_TYPE&, const std::vector<ERROR_TYPE>&)> error;
 };
