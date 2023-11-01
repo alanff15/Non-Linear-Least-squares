@@ -6,9 +6,14 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+find_package(OpenMP REQUIRED)
+
+link_libraries(
+    OpenMP::OpenMP_CXX
+)
+
 #################################################
 add_executable(mle #WIN32
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/NonLinearLSQ.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
 )
 #################################################
