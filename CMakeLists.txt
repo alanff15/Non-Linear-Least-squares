@@ -7,10 +7,7 @@ include_directories(
 )
 
 find_package(OpenMP REQUIRED)
-
-link_libraries(
-    OpenMP::OpenMP_CXX
-)
+link_libraries(OpenMP::OpenMP_CXX)
 
 #################################################
 add_executable(mle #WIN32

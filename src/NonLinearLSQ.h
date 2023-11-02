@@ -20,10 +20,19 @@ public:
   void solve(const VEC_TYPE&);
   VEC_TYPE getParam();
 
+  void setMaxIteration(int);
+  void setEpsilon(NUM_TYPE);
+  void setDelta(VEC_TYPE);
+  int getMaxIteration();
+  NUM_TYPE getEpsilon();
+  VEC_TYPE getDelta();
+
 private:
   NUM_TYPE derror_dx(int, const VEC_TYPE&, const std::vector<NUM_TYPE>&);
   void getSystem(const VEC_TYPE&, MAT_TYPE&, VEC_TYPE&);
 
+  int max_iterations;
+  NUM_TYPE epsilon;
   VEC_TYPE delta;
   VEC_TYPE final_param;
   const std::vector<std::vector<NUM_TYPE>>* data;
@@ -31,11 +40,14 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-//   Implementation:   ////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
+// Implementation:
 
 template <typename NUM_TYPE, uint32_t N>
-NonLinearLSQ<NUM_TYPE, N>::NonLinearLSQ() {}
+NonLinearLSQ<NUM_TYPE, N>::NonLinearLSQ() {
+  max_iterations = DEFAULT_MAX_ITR;
+  epsilon = (NUM_TYPE)DEFAULT_EPSILON;
+  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
+}
 
 template <typename NUM_TYPE, uint32_t N>
 NonLinearLSQ<NUM_TYPE, N>::~NonLinearLSQ() {}
@@ -49,8 +61,6 @@ NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::derror_dx(int dx_index, const VEC_TYPE& inpu
 
 template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& input, MAT_TYPE& H, VEC_TYPE& b) {
-  delta.resize(input.rows(), 1);
-  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
   // zerar sistema
   for (int j, i = 0; i < H.rows(); i++) {
     for (j = 0; j < H.cols(); j++) {
@@ -96,11 +106,39 @@ void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& input_gess) {
     getSystem(param, H, b);
     delta_param = H.colPivHouseholderQr().solve(-b);
     param += delta_param;
-  } while ((delta_param.norm() > (NUM_TYPE)DEFAULT_EPSILON) && (++itr < DEFAULT_MAX_ITR));
+  } while ((delta_param.norm() > epsilon) && (++itr < max_iterations));
   final_param = param;
 }
 
 template <typename NUM_TYPE, uint32_t N>
 VEC_TYPE NonLinearLSQ<NUM_TYPE, N>::getParam() {
   return final_param;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setMaxIteration(int val) {}
+
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setEpsilon(NUM_TYPE val) {
+  epsilon = val;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setDelta(VEC_TYPE val) {
+  delta = val;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+int NonLinearLSQ<NUM_TYPE, N>::getMaxIteration() {
+  return max_iterations;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::getEpsilon() {
+  return epsilon;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+VEC_TYPE NonLinearLSQ<NUM_TYPE, N>::getDelta() {
+  return delta;
 }
