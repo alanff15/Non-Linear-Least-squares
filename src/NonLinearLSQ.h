@@ -14,23 +14,22 @@ class NonLinearLSQ {
 public:
   NonLinearLSQ();
   ~NonLinearLSQ();
-
-  void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>&);
-  void setData(const std::vector<std::vector<NUM_TYPE>>&);
-  void solve(const VEC_TYPE&);
+  void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func);
+  void setData(const std::vector<std::vector<NUM_TYPE>>& data_in);
+  void solve(const VEC_TYPE& param_gess);
   VEC_TYPE getParam();
-
-  void setMaxIteration(int);
-  void setEpsilon(NUM_TYPE);
-  void setDelta(VEC_TYPE);
+  // set-get
+  void setMaxIteration(int val);
+  void setEpsilon(NUM_TYPE val);
+  void setDelta(VEC_TYPE val);
   int getMaxIteration();
   NUM_TYPE getEpsilon();
   VEC_TYPE getDelta();
 
 private:
-  NUM_TYPE derror_dx(int, const VEC_TYPE&, const std::vector<NUM_TYPE>&);
-  void getSystem(const VEC_TYPE&, MAT_TYPE&, VEC_TYPE&);
-
+  NUM_TYPE derror_dx(int dx_index, const VEC_TYPE& param, const std::vector<NUM_TYPE>& data_line);
+  void getSystem(const VEC_TYPE& param, MAT_TYPE& H, VEC_TYPE& b);
+  // atributos
   int max_iterations;
   NUM_TYPE epsilon;
   VEC_TYPE delta;
@@ -53,36 +52,57 @@ template <typename NUM_TYPE, uint32_t N>
 NonLinearLSQ<NUM_TYPE, N>::~NonLinearLSQ() {}
 
 template <typename NUM_TYPE, uint32_t N>
-NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::derror_dx(int dx_index, const VEC_TYPE& input, const std::vector<NUM_TYPE>& data_line) {
-  VEC_TYPE input_delta = input;
+NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::derror_dx(int dx_index, const VEC_TYPE& param, const std::vector<NUM_TYPE>& data_line) {
+  VEC_TYPE input_delta = param;
   input_delta[dx_index] += delta[dx_index];
-  return (error(input_delta, data_line) - error(input, data_line)) / delta[dx_index];
+  return (error(input_delta, data_line) - error(param, data_line)) / delta[dx_index];
 }
 
 template <typename NUM_TYPE, uint32_t N>
-void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& input, MAT_TYPE& H, VEC_TYPE& b) {
-  // zerar sistema
+void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE& H, VEC_TYPE& b) {
+  // definir quantidade de threads
+  int threads = std::min(12, (int)data->size());
+  MAT_TYPE* Hs = new MAT_TYPE[threads];
+  VEC_TYPE* bs = new VEC_TYPE[threads];
+  int* dlimits = new int[threads + 1];
+  // varrer dados
+  dlimits[0] = 0;
+  dlimits[1] = (int)data->size() / threads;
+  dlimits[threads] = (int)data->size();
+  for (int th = 2; th < threads; th++) dlimits[th] = dlimits[th - 1] + dlimits[1];
+#pragma omp parallel for schedule(guided)
+  for (int th = 0; th < threads; th++) {
+    VEC_TYPE Jt;  // rows:IN_TYPE cols:OUT_TYPE
+    NUM_TYPE err;
+    // zerar
+    for (int j, i = 0; i < Hs[th].rows(); i++) {
+      for (j = 0; j < Hs[th].cols(); j++) {
+        Hs[th](i, j) = 0;
+      }
+      bs[th](i) = 0;
+    }
+    // calcular sistema parcial
+    for (int i = dlimits[th]; i < dlimits[th + 1]; i++) {
+      err = error(param, (*data)[i]);
+      for (int j = 0; j < Jt.rows(); j++) Jt(j) = derror_dx(j, param, (*data)[i]);
+      Hs[th] += Jt * Jt.transpose();
+      bs[th] += Jt * err;
+    }
+  }
+  // sistema final
   for (int j, i = 0; i < H.rows(); i++) {
     for (j = 0; j < H.cols(); j++) {
       H(i, j) = 0;
     }
     b(i) = 0;
   }
-  // varer dados
-  MAT_TYPE Hs;
-  VEC_TYPE bs;
-  VEC_TYPE Jt;  // rows:IN_TYPE cols:OUT_TYPE
-  NUM_TYPE err;
-  for (int j, i = 0; i < data->size(); i++) {
-    err = error(input, (*data)[i]);
-    for (j = 0; j < Jt.rows(); j++) {
-      Jt(j) = derror_dx(j, input, (*data)[i]);
-    }
-    Hs << Jt * Jt.transpose();
-    bs << Jt * err;
-    H += Hs;
-    b += bs;
+  for (int th = 0; th < threads; th++) {
+    H += Hs[th];
+    b += bs[th];
   }
+  delete[] dlimits;
+  delete[] Hs;
+  delete[] bs;
 }
 
 template <typename NUM_TYPE, uint32_t N>
@@ -96,8 +116,8 @@ void NonLinearLSQ<NUM_TYPE, N>::setData(const std::vector<std::vector<NUM_TYPE>>
 }
 
 template <typename NUM_TYPE, uint32_t N>
-void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& input_gess) {
-  VEC_TYPE param = input_gess;
+void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_gess) {
+  VEC_TYPE param = param_gess;
   MAT_TYPE H;
   VEC_TYPE b;
   VEC_TYPE delta_param;
