@@ -31,8 +31,9 @@ int main() {
   lsq.solve(Eigen::Vector2f(0, 0));
 
   // mostrar resultado
-  std::cout << "Ideal: 0.5\t0.1" << std::endl;
-  std::cout << "Calc.: " << lsq.getParam()[0] << "\t" << lsq.getParam()[1] << std::endl;
+  std::cout << "Params:  " << lsq.getParam()[0] << "\t" << lsq.getParam()[1] << std::endl;
+  std::cout << "Iter.:   " << lsq.getLastIterations() << std::endl;
+  std::cout << "Erro:    " << lsq.getError() << std::endl;
 
   return EXIT_SUCCESS;
 }
