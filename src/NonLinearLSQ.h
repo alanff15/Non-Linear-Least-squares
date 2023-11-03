@@ -15,6 +15,7 @@ public:
   NonLinearLSQ();
   ~NonLinearLSQ();
   void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func);
+  void setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& kfunc);
   void setData(const std::vector<std::vector<NUM_TYPE>>& data_in);
   void solve(const VEC_TYPE& param_gess);
   VEC_TYPE getParam();
@@ -40,6 +41,7 @@ private:
   VEC_TYPE final_param;
   const std::vector<std::vector<NUM_TYPE>>* data;
   std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)> error;
+  std::function<NUM_TYPE(const NUM_TYPE)> kernel;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -51,6 +53,7 @@ NonLinearLSQ<NUM_TYPE, N>::NonLinearLSQ() {
   iterations = 0;
   epsilon = (NUM_TYPE)DEFAULT_EPSILON;
   for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
+  kernel = [](double err) { return 1.0; };
 }
 
 template <typename NUM_TYPE, uint32_t N>
@@ -79,7 +82,7 @@ inline void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE
 #pragma omp parallel for schedule(guided)
   for (int th = 0; th < threads; th++) {
     VEC_TYPE Jt;  // rows:IN_TYPE cols:OUT_TYPE
-    NUM_TYPE err;
+    NUM_TYPE w, err;
     // zerar
     for (int j, i = 0; i < Hs[th].rows(); i++) {
       for (j = 0; j < Hs[th].cols(); j++) {
@@ -91,9 +94,10 @@ inline void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE
     // calcular sistema parcial
     for (int i = dlimits[th]; i < dlimits[th + 1]; i++) {
       err = error(param, (*data)[i]);
+      w = kernel(err);
       for (int j = 0; j < Jt.rows(); j++) Jt(j) = derror_dx(j, param, (*data)[i]);
-      Hs[th] += Jt * Jt.transpose();
-      bs[th] += Jt * err;
+      Hs[th] += w * Jt * Jt.transpose();
+      bs[th] += w * Jt * err;
       errs[th] += err;
     }
   }
@@ -119,6 +123,12 @@ inline void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE
 template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func) {
   error = func;
+  iterations = 0;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& kfunc) {
+  kernel = kfunc;
   iterations = 0;
 }
 
