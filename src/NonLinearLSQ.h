@@ -14,10 +14,11 @@ class NonLinearLSQ {
 public:
   NonLinearLSQ();
   ~NonLinearLSQ();
-  void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func);
+  void setErrorFunction(const std::function<NUM_TYPE(const NUM_TYPE[N], const std::vector<NUM_TYPE>&)>& func);
   void setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& kfunc);
   void setData(const std::vector<std::vector<NUM_TYPE>>& data_in);
   void solve();
+  void solve(const NUM_TYPE param_gess[N]);
   void solve(const VEC_TYPE& param_gess);
   VEC_TYPE getParam();
   // set-get
@@ -43,8 +44,8 @@ private:
   Eigen::Matrix<NUM_TYPE, N, 2> param_limits;
   VEC_TYPE final_param;
   const std::vector<std::vector<NUM_TYPE>>* data;
-  std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)> error;
   std::function<NUM_TYPE(const NUM_TYPE)> kernel;
+  std::function<NUM_TYPE(const NUM_TYPE[N], const std::vector<NUM_TYPE>&)> error;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -70,7 +71,7 @@ template <typename NUM_TYPE, uint32_t N>
 inline NUM_TYPE NonLinearLSQ<NUM_TYPE, N>::derror_dx(int dx_index, const VEC_TYPE& param, const std::vector<NUM_TYPE>& data_line) {
   VEC_TYPE input_delta = param;
   input_delta[dx_index] += delta[dx_index];
-  return (error(input_delta, data_line) - error(param, data_line)) / delta[dx_index];
+  return (error(&input_delta[0], data_line) - error(&param[0], data_line)) / delta[dx_index];
 }
 
 template <typename NUM_TYPE, uint32_t N>
@@ -100,7 +101,7 @@ inline void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE
     errs[th] = 0;
     // calcular sistema parcial
     for (int i = dlimits[th]; i < dlimits[th + 1]; i++) {
-      err = error(param, (*data)[i]);
+      err = error(&param[0], (*data)[i]);
       w = kernel(err);
       for (int j = 0; j < Jt.rows(); j++) Jt(j) = derror_dx(j, param, (*data)[i]);
       Hs[th] += w * Jt * Jt.transpose();
@@ -128,7 +129,7 @@ inline void NonLinearLSQ<NUM_TYPE, N>::getSystem(const VEC_TYPE& param, MAT_TYPE
 }
 
 template <typename NUM_TYPE, uint32_t N>
-void NonLinearLSQ<NUM_TYPE, N>::setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func) {
+void NonLinearLSQ<NUM_TYPE, N>::setErrorFunction(const std::function<NUM_TYPE(const NUM_TYPE[N], const std::vector<NUM_TYPE>&)>& func) {
   error = func;
   iterations = 0;
 }
@@ -157,8 +158,14 @@ void NonLinearLSQ<NUM_TYPE, N>::solve() {
 }
 
 template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::solve(const NUM_TYPE param_gess[N]) {
+  VEC_TYPE gess;
+  for (int i = 0; i < gess.rows(); i++) gess(i) = param_gess[i];
+  solve(gess);
+}
+
+template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_gess) {
-  std::cout << "param_gess = " << param_gess.transpose() << std::endl;
   VEC_TYPE param = param_gess;
   MAT_TYPE H;
   VEC_TYPE b;

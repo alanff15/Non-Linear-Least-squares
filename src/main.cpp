@@ -52,16 +52,16 @@ int main() {
   lsq.setData(dados);
 
   // definir funcao de erro: y = f(x) | err = (y-f(x))²
-  lsq.setErrorFunction([](const Eigen::Matrix<double, 3, 1>& p, const std::vector<double>& yx) {
+  lsq.setErrorFunction([](const double* p, const std::vector<double>& yx) {
     double ret = yx[0];                                 // y
     ret -= p[0] * exp(-pow((yx[1] - p[1]) * p[2], 2));  // f(x)
-    return ret * ret;
+    return ret * ret;                                   // err
   });
 
   // definir kernel
   lsq.setKernel([](double erro) {
-    double aux = erro / 3;
-    double w = exp(-aux * aux);
+    erro *= 5.5;
+    double w = exp(-erro * erro);
     return w;
   });
 
@@ -74,9 +74,9 @@ int main() {
   lsq.solve();
 
   // mostrar resultado
-  std::cout << "Params:  " << lsq.getParam().transpose() << std::endl;
-  std::cout << "Iter.:   " << lsq.getLastIterations() << std::endl;
-  std::cout << "Erro:    " << lsq.getError() << std::endl;
+  std::cout << "Params: " << lsq.getParam().transpose() << std::endl;
+  std::cout << "Iter.:  " << lsq.getLastIterations() << std::endl;
+  std::cout << "Erro:   " << lsq.getError() << std::endl;
 
   return EXIT_SUCCESS;
 }
