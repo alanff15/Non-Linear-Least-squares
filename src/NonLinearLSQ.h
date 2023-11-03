@@ -17,6 +17,7 @@ public:
   void setErrorFunction(const std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)>& func);
   void setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& kfunc);
   void setData(const std::vector<std::vector<NUM_TYPE>>& data_in);
+  void solve();
   void solve(const VEC_TYPE& param_gess);
   VEC_TYPE getParam();
   // set-get
@@ -145,12 +146,29 @@ void NonLinearLSQ<NUM_TYPE, N>::setData(const std::vector<std::vector<NUM_TYPE>>
 }
 
 template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::solve() {
+  VEC_TYPE gess = VEC_TYPE::Zero();
+  for (int i = 0; i < param_limits.rows(); i++) {
+    if (param_limits(i, 0) > (NUM_TYPE)(-INFINITY) && param_limits(i, 1) < (NUM_TYPE)(INFINITY)) {
+      gess(i) = (param_limits(i, 0) + param_limits(i, 1)) / (NUM_TYPE)2.0;
+    }
+  }
+  solve(gess);
+}
+
+template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_gess) {
+  std::cout << "param_gess = " << param_gess.transpose() << std::endl;
   VEC_TYPE param = param_gess;
   MAT_TYPE H;
   VEC_TYPE b;
   VEC_TYPE delta_param;
   int itr = 1;
+  // check limits
+  for (int i = 0; i < param_limits.rows(); i++) {
+    param(i) = (param(i) < param_limits(i, 0) ? param_limits(i, 0) : param(i));
+    param(i) = (param(i) > param_limits(i, 1) ? param_limits(i, 1) : param(i));
+  }
   do {
     getSystem(param, H, b);
     delta_param = H.colPivHouseholderQr().solve(-b);
