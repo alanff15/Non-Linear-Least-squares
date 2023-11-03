@@ -65,8 +65,12 @@ int main() {
     return w;
   });
 
+  // limitar parametros
+  lsq.setLimits(0, 1, 4);
+  lsq.setLimits(2, 0.5, 2);
+
   // resolver
-  lsq.solve(Eigen::Matrix<double, 3, 1>(1, 3.7, 1));
+  lsq.solve(Eigen::Matrix<double, 3, 1>(1, 2, 1));
 
   // mostrar resultado
   std::cout << "Params:  " << lsq.getParam().transpose() << std::endl;

@@ -23,6 +23,7 @@ public:
   void setMaxIteration(int val);
   void setEpsilon(NUM_TYPE val);
   void setDelta(VEC_TYPE val);
+  void setLimits(int param_index, NUM_TYPE min, NUM_TYPE max);
   int getMaxIteration();
   NUM_TYPE getEpsilon();
   VEC_TYPE getDelta();
@@ -38,6 +39,7 @@ private:
   NUM_TYPE epsilon;
   NUM_TYPE last_error;
   VEC_TYPE delta;
+  Eigen::Matrix<NUM_TYPE, N, 2> param_limits;
   VEC_TYPE final_param;
   const std::vector<std::vector<NUM_TYPE>>* data;
   std::function<NUM_TYPE(const VEC_TYPE&, const std::vector<NUM_TYPE>&)> error;
@@ -54,6 +56,10 @@ NonLinearLSQ<NUM_TYPE, N>::NonLinearLSQ() {
   epsilon = (NUM_TYPE)DEFAULT_EPSILON;
   for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
   kernel = [](double err) { return 1.0; };
+  for (int i = 0; i < param_limits.rows(); i++) {
+    param_limits(i, 0) = (NUM_TYPE)(-INFINITY);
+    param_limits(i, 1) = (NUM_TYPE)(INFINITY);
+  }
 }
 
 template <typename NUM_TYPE, uint32_t N>
@@ -149,6 +155,11 @@ void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_gess) {
     getSystem(param, H, b);
     delta_param = H.colPivHouseholderQr().solve(-b);
     param += delta_param;
+    // check limits
+    for (int i = 0; i < param_limits.rows(); i++) {
+      param(i) = (param(i) < param_limits(i, 0) ? param_limits(i, 0) : param(i));
+      param(i) = (param(i) > param_limits(i, 1) ? param_limits(i, 1) : param(i));
+    }
   } while ((delta_param.norm() > epsilon) && (++itr < max_iterations));
   iterations = itr;
   final_param = param;
@@ -170,6 +181,12 @@ void NonLinearLSQ<NUM_TYPE, N>::setEpsilon(NUM_TYPE val) {
 template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::setDelta(VEC_TYPE val) {
   delta = val;
+}
+
+template <typename NUM_TYPE, uint32_t N>
+void NonLinearLSQ<NUM_TYPE, N>::setLimits(int param_index, NUM_TYPE min, NUM_TYPE max) {
+  param_limits(param_index, 0) = min;
+  param_limits(param_index, 1) = max;
 }
 
 template <typename NUM_TYPE, uint32_t N>
