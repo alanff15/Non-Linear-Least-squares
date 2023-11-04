@@ -14,22 +14,86 @@ class NonLinearLSQ {
 public:
   NonLinearLSQ();
   ~NonLinearLSQ();
-  void setErrorFunction(const std::function<NUM_TYPE(const NUM_TYPE[N], const std::vector<NUM_TYPE>&)>& func);
-  void setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& kfunc);
+
+  /// @brief Defines error function that relates params with data_lines, must
+  // be at minimum when params are correct, preferably has an only global
+  // minimum
+  /// @param func
+  void setErrorFunction(const std::function<NUM_TYPE(const NUM_TYPE params[N], const std::vector<NUM_TYPE>& data_line)>& func);
+
+  /// @brief Defines robust kernel function that gives wheights to data_lines
+  // based on the error they generate, if not defined the default kernel
+  // function always returns 1
+  /// @param func
+  void setKernel(const std::function<NUM_TYPE(const NUM_TYPE)>& func);
+
+  /// @brief Defines data used for curve fitting
+  /// @param data_in
   void setData(const std::vector<std::vector<NUM_TYPE>>& data_in);
+
+  /// @brief Curve fitting, for initial guess of the params it uses the mean
+  // value of the limits of each param or zero if limits not defined
   void solve();
-  void solve(const NUM_TYPE param_gess[N]);
-  void solve(const VEC_TYPE& param_gess);
+
+  /// @brief Curve fitting, uses 'param_guess' array as initial guess of the
+  // params
+  /// @param param_guess
+  void solve(const NUM_TYPE param_guess[N]);
+
+  /// @brief Curve fitting, uses 'param_guess' Eigen::Vector as initial guess
+  // of the params
+  /// @param param_guess
+  void solve(const VEC_TYPE& param_guess);
+
+  // set-get:
+
+  /// @brief Returns result of curve fitting
+  /// @return Eigen::Vector
   VEC_TYPE getParam();
-  // set-get
+
+  /// @brief Set max iterations allowd for solution, default value is
+  // DEFAULT_MAX_ITR
+  /// @param val
   void setMaxIteration(int val);
+
+  /// @brief Set minimum threshold of change in params for considering
+  // convergence, default value is DEFAULT_EPSILON
+  /// @param val
   void setEpsilon(NUM_TYPE val);
+
+  /// @brief Set increment in params used for computing rate of change
+  // numerically, recieves 'val' as an Eigen::Vector
+  /// @param val
   void setDelta(VEC_TYPE val);
+
+  /// @brief Set limits to param values, helps avoid divergency, if not set the
+  // default limits are -INFINITY and INFINITY
+  /// @param param_index
+  /// @param min
+  /// @param max
   void setLimits(int param_index, NUM_TYPE min, NUM_TYPE max);
+
+  /// @brief Returns the maximum number of iterations allowed in a 'solve' call
+  /// @return int
   int getMaxIteration();
+
+  /// @brief Returns the actual minimum threshold of change in params for
+  // considering convergence
+  /// @return Eigen::Vector
   NUM_TYPE getEpsilon();
+
+  /// @brief Returns the actual increment in params used for computing rate of
+  // change numerically
+  /// @return Eigen::Vector
   VEC_TYPE getDelta();
+
+  /// @brief Returns the number of iterations it took to converge in the last
+  // 'solve' call
+  /// @return int
   int getLastIterations();
+
+  /// @brief Returns the sum of the error function evaluated for each data_line
+  /// @return NUM_TYPE
   NUM_TYPE getError();
 
 private:
@@ -148,25 +212,25 @@ void NonLinearLSQ<NUM_TYPE, N>::setData(const std::vector<std::vector<NUM_TYPE>>
 
 template <typename NUM_TYPE, uint32_t N>
 void NonLinearLSQ<NUM_TYPE, N>::solve() {
-  VEC_TYPE gess = VEC_TYPE::Zero();
+  VEC_TYPE guess = VEC_TYPE::Zero();
   for (int i = 0; i < param_limits.rows(); i++) {
     if (param_limits(i, 0) > (NUM_TYPE)(-INFINITY) && param_limits(i, 1) < (NUM_TYPE)(INFINITY)) {
-      gess(i) = (param_limits(i, 0) + param_limits(i, 1)) / (NUM_TYPE)2.0;
+      guess(i) = (param_limits(i, 0) + param_limits(i, 1)) / (NUM_TYPE)2.0;
     }
   }
-  solve(gess);
+  solve(guess);
 }
 
 template <typename NUM_TYPE, uint32_t N>
-void NonLinearLSQ<NUM_TYPE, N>::solve(const NUM_TYPE param_gess[N]) {
-  VEC_TYPE gess;
-  for (int i = 0; i < gess.rows(); i++) gess(i) = param_gess[i];
-  solve(gess);
+void NonLinearLSQ<NUM_TYPE, N>::solve(const NUM_TYPE param_guess[N]) {
+  VEC_TYPE guess;
+  for (int i = 0; i < guess.rows(); i++) guess(i) = param_guess[i];
+  solve(guess);
 }
 
 template <typename NUM_TYPE, uint32_t N>
-void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_gess) {
-  VEC_TYPE param = param_gess;
+void NonLinearLSQ<NUM_TYPE, N>::solve(const VEC_TYPE& param_guess) {
+  VEC_TYPE param = param_guess;
   MAT_TYPE H;
   VEC_TYPE b;
   VEC_TYPE delta_param;
