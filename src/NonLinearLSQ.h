@@ -2,12 +2,12 @@
 
 #include <Eigen/Eigen>
 
-#define DEFAULT_MAX_ITR 500
-#define DEFAULT_EPSILON (1e-6)
-#define DEFAULT_DELTA (1e-5)
+#define NLLSQ_MAX_ITR 500
+#define NLLSQ_EPSILON (1e-6)
+#define NLLSQ_DELTA (1e-5)
 
-#define VEC_TYPE Eigen::Matrix<NUM_TYPE, PARAM_COUNT, 1>
-#define MAT_TYPE Eigen::Matrix<NUM_TYPE, PARAM_COUNT, PARAM_COUNT>
+#define NLLSQ_VEC Eigen::Matrix<NUM_TYPE, PARAM_COUNT, 1>
+#define NLLSQ_MAT Eigen::Matrix<NUM_TYPE, PARAM_COUNT, PARAM_COUNT>
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 class NonLinearLSQ {
@@ -43,28 +43,28 @@ public:
   /// @brief Curve fitting, uses 'param_guess' Eigen::Vector as initial guess
   // of the params
   /// @param param_guess
-  void solve(const VEC_TYPE& param_guess);
+  void solve(const NLLSQ_VEC& param_guess);
 
   // set-get:
 
   /// @brief Returns result of curve fitting
   /// @return Eigen::Vector
-  VEC_TYPE getParam();
+  NLLSQ_VEC getParam();
 
   /// @brief Set max iterations allowd for solution, default value is
-  // DEFAULT_MAX_ITR
+  // NLLSQ_MAX_ITR
   /// @param val
   void setMaxIteration(int val);
 
   /// @brief Set minimum threshold of change in params for considering
-  // convergence, default value is DEFAULT_EPSILON
+  // convergence, default value is NLLSQ_EPSILON
   /// @param val
   void setEpsilon(NUM_TYPE val);
 
   /// @brief Set increment in params used for computing rate of change
   // numerically, recieves 'val' as an Eigen::Vector
   /// @param val
-  void setDelta(VEC_TYPE val);
+  void setDelta(NLLSQ_VEC val);
 
   /// @brief Set limits to param values, helps avoid divergency, if not set the
   // default limits are -INFINITY and INFINITY
@@ -85,7 +85,7 @@ public:
   /// @brief Returns the actual increment in params used for computing rate of
   // change numerically
   /// @return Eigen::Vector
-  VEC_TYPE getDelta();
+  NLLSQ_VEC getDelta();
 
   /// @brief Returns the number of iterations it took to converge in the last
   // 'solve' call
@@ -97,16 +97,16 @@ public:
   NUM_TYPE getError();
 
 private:
-  NUM_TYPE derror_dx(int dx_index, const VEC_TYPE& param, const DATA_TYPE& data_line);
-  void getSystem(const VEC_TYPE& param, MAT_TYPE& H, VEC_TYPE& b);
+  NUM_TYPE derror_dx(int dx_index, const NLLSQ_VEC& param, const DATA_TYPE& data_line);
+  void getSystem(const NLLSQ_VEC& param, NLLSQ_MAT& H, NLLSQ_VEC& b);
   // atributos
   int max_iterations;
   int iterations;
   NUM_TYPE epsilon;
   NUM_TYPE last_error;
-  VEC_TYPE delta;
+  NLLSQ_VEC delta;
   Eigen::Matrix<NUM_TYPE, PARAM_COUNT, 2> param_limits;
-  VEC_TYPE final_param;
+  NLLSQ_VEC final_param;
   const std::vector<DATA_TYPE>* data;
   std::function<NUM_TYPE(const NUM_TYPE)> kernel;
   std::function<NUM_TYPE(const NUM_TYPE[PARAM_COUNT], const DATA_TYPE&)> error;
@@ -117,10 +117,10 @@ private:
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::NonLinearLSQ() {
-  max_iterations = DEFAULT_MAX_ITR;
+  max_iterations = NLLSQ_MAX_ITR;
   iterations = 0;
-  epsilon = (NUM_TYPE)DEFAULT_EPSILON;
-  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)DEFAULT_DELTA;
+  epsilon = (NUM_TYPE)NLLSQ_EPSILON;
+  for (int i = 0; i < delta.rows(); i++) delta(i) = (NUM_TYPE)NLLSQ_DELTA;
   kernel = [](double err) { return 1.0; };
   for (int i = 0; i < param_limits.rows(); i++) {
     param_limits(i, 0) = (NUM_TYPE)(-INFINITY);
@@ -132,18 +132,18 @@ template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::~NonLinearLSQ() {}
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-inline NUM_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::derror_dx(int dx_index, const VEC_TYPE& param, const DATA_TYPE& data_line) {
-  VEC_TYPE input_delta = param;
+inline NUM_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::derror_dx(int dx_index, const NLLSQ_VEC& param, const DATA_TYPE& data_line) {
+  NLLSQ_VEC input_delta = param;
   input_delta[dx_index] += delta[dx_index];
   return (error(&input_delta[0], data_line) - error(&param[0], data_line)) / delta[dx_index];
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-inline void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getSystem(const VEC_TYPE& param, MAT_TYPE& H, VEC_TYPE& b) {
+inline void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getSystem(const NLLSQ_VEC& param, NLLSQ_MAT& H, NLLSQ_VEC& b) {
   // definir quantidade de threads
   int threads = std::min(12, (int)data->size());
-  MAT_TYPE* Hs = new MAT_TYPE[threads];
-  VEC_TYPE* bs = new VEC_TYPE[threads];
+  NLLSQ_MAT* Hs = new NLLSQ_MAT[threads];
+  NLLSQ_VEC* bs = new NLLSQ_VEC[threads];
   NUM_TYPE* errs = new NUM_TYPE[threads];
   int* dlimits = new int[threads + 1];
   // varrer dados
@@ -153,7 +153,7 @@ inline void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getSystem(const VEC_
   for (int th = 2; th < threads; th++) dlimits[th] = dlimits[th - 1] + dlimits[1];
 #pragma omp parallel for schedule(guided)
   for (int th = 0; th < threads; th++) {
-    VEC_TYPE Jt;  // rows:IN_TYPE cols:OUT_TYPE
+    NLLSQ_VEC Jt;  // rows:IN_TYPE cols:OUT_TYPE
     NUM_TYPE w, err;
     // zerar
     for (int j, i = 0; i < Hs[th].rows(); i++) {
@@ -212,7 +212,7 @@ void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setData(const std::vector<D
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve() {
-  VEC_TYPE guess = VEC_TYPE::Zero();
+  NLLSQ_VEC guess = NLLSQ_VEC::Zero();
   for (int i = 0; i < param_limits.rows(); i++) {
     if (param_limits(i, 0) > (NUM_TYPE)(-INFINITY) && param_limits(i, 1) < (NUM_TYPE)(INFINITY)) {
       guess(i) = (param_limits(i, 0) + param_limits(i, 1)) / (NUM_TYPE)2.0;
@@ -223,17 +223,17 @@ void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve() {
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve(const NUM_TYPE param_guess[PARAM_COUNT]) {
-  VEC_TYPE guess;
+  NLLSQ_VEC guess;
   for (int i = 0; i < guess.rows(); i++) guess(i) = param_guess[i];
   solve(guess);
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve(const VEC_TYPE& param_guess) {
-  VEC_TYPE param = param_guess;
-  MAT_TYPE H;
-  VEC_TYPE b;
-  VEC_TYPE delta_param;
+void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve(const NLLSQ_VEC& param_guess) {
+  NLLSQ_VEC param = param_guess;
+  NLLSQ_MAT H;
+  NLLSQ_VEC b;
+  NLLSQ_VEC delta_param;
   int itr = 1;
   // check limits
   for (int i = 0; i < param_limits.rows(); i++) {
@@ -255,7 +255,7 @@ void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::solve(const VEC_TYPE& param
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-VEC_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getParam() {
+NLLSQ_VEC NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getParam() {
   return final_param;
 }
 
@@ -270,7 +270,7 @@ void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setEpsilon(NUM_TYPE val) {
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setDelta(VEC_TYPE val) {
+void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setDelta(NLLSQ_VEC val) {
   delta = val;
 }
 
@@ -291,7 +291,7 @@ NUM_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getEpsilon() {
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-VEC_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getDelta() {
+NLLSQ_VEC NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getDelta() {
   return delta;
 }
 
