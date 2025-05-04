@@ -260,7 +260,9 @@ VEC_TYPE NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::getParam() {
 }
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
-void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setMaxIteration(int val) {}
+void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setMaxIteration(int val) {
+  max_iterations = val;
+}
 
 template <typename NUM_TYPE, typename DATA_TYPE, uint32_t PARAM_COUNT>
 void NonLinearLSQ<NUM_TYPE, DATA_TYPE, PARAM_COUNT>::setEpsilon(NUM_TYPE val) {
